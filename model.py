@@ -6,10 +6,13 @@ import seaborn as sns
 from scipy import stats
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
+from sklearn import linear_model
+from sklearn import metrics
+from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler
 
-data = pd.read_csv("/content/ApartmentRentPrediction.csv")
+data = pd.read_csv("data/ApartmentRentPrediction.csv")
 
 # Creating Dataframe
 print("Shape of the DataFrame:", data.shape)
@@ -79,8 +82,8 @@ data_encoded = encode_categorical(data, categorical_columns)
 print("Encoded DataFrame:")
 print(data.head())
 
-  sns.pairplot(data, y_vars=['price_display'], x_vars=data.columns, height=2)
-  plt.show()
+sns.pairplot(data, y_vars=['price_display'], x_vars=data.columns, height=2)
+plt.show()
 
 columns_with_outliers = ['amenities', 'bathrooms', 'bedrooms', 'pets_allowed', 'price_display', 'square_feet', 'latitude', 'longitude']
 
@@ -128,10 +131,36 @@ top_features = top_features.drop('price_display')
 X = data_cleaned[top_features]
 
 
-    # data splitting
+# data splitting
+x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.20, shuffle=True, random_state=10)
 
-    # model training
+# model training
+# polynomial model
+poly_features = PolynomialFeatures(degree=5)
+X_train_poly = poly_features.fit_transform(x_train)
 
-    # model testing
+poly_model = linear_model.LinearRegression()
+poly_model.fit(X_train_poly, y_train)
+
+# model testing
+prediction = poly_model.predict(poly_features.fit_transform(x_test))
+prediction1 = poly_model.predict(poly_features.fit_transform(x_train))
+
+print("polynomial model")
+print('Mean Square Error for testing', metrics.mean_squared_error(y_test, prediction))
+print('Mean Square Error for training', metrics.mean_squared_error(y_train, prediction1))
+
+# model training
+# linear model
+linear_reg = linear_model.LinearRegression()
+linear_reg.fit(x_train, y_train)
+
+# model testing
+y_train_prediction = linear_reg.predict(x_train)
+y_predict = linear_reg.predict(x_test)
+
+print("\nlinear model")
+print('Mean Square Error for testing', metrics.mean_squared_error(y_test, y_predict))
+print('Mean Square Error for training', metrics.mean_squared_error(y_train, y_train_prediction))
 
 
