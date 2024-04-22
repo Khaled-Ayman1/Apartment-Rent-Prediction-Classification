@@ -34,7 +34,14 @@ print(data.duplicated().sum())
 
 print("Most common value in pets_allowed:", data["pets_allowed"].mode()[0])
 print("Most common value in amenities:", data["amenities"].mode()[0])
-print("Most common value in address:", data["address"].mode()[0])
+
+values_to_choose_from = data['address'].dropna().unique()  # Get unique values from the column, excluding NaNs
+random_values = np.random.choice(values_to_choose_from, size=len(data), replace=True)  # Generate random values
+
+# Fill the column with random values
+data['address'] = random_values
+
+
 print("Most common value in bedrooms:", data["bedrooms"].mode()[0])
 print("Most common value in bathrooms:", data["bathrooms"].mode()[0])
 print("Most common value in cityname:", data["cityname"].mode()[0])
@@ -47,7 +54,6 @@ data["pets_allowed"].fillna('Cats,Dogs', inplace=True)
 data["amenities"].fillna('Parking', inplace=True)
 data["bathrooms"].fillna('1.0', inplace=True)
 data["bedrooms"].fillna('1.0', inplace=True)
-data["address"].fillna('908 8th SW St', inplace=True)
 data["cityname"].fillna('Austin', inplace=True)
 data["state"].fillna('Austin', inplace=True)
 data["pets_allowed"].fillna('TX,Dogs', inplace=True)
@@ -63,7 +69,9 @@ print(data.info())
 # Preprocessing price_display column
 data['price_display'] = data['price_display'].str.replace('[^\d.]', '', regex=True).astype(float)
 
-columns_to_drop = ['category','id','price', 'title', 'body', 'address', 'source', 'time','currency', 'fee','has_photo','price_type']
+
+
+columns_to_drop = ['category','id','price', 'title', 'body', 'source', 'time','currency', 'fee','has_photo','price_type']
 data = data.drop(columns=columns_to_drop)
 
 data.info()
@@ -75,7 +83,7 @@ def encode_categorical(data, columns):
         data[column] = label_encoder.fit_transform(data[column])
     return data
 
-categorical_columns = ['amenities', 'cityname', 'state', 'pets_allowed']
+categorical_columns = ['amenities', 'cityname', 'state', 'pets_allowed', 'address']
 data_encoded = encode_categorical(data, categorical_columns)
 
 # Displaying the encoded DataFrame
@@ -83,7 +91,7 @@ print("Encoded DataFrame:")
 print(data.head())
 
 sns.pairplot(data, y_vars=['price_display'], x_vars=data.columns, height=2)
-plt.show()
+#plt.show()
 
 columns_with_outliers = ['amenities', 'bathrooms', 'bedrooms', 'pets_allowed', 'price_display', 'square_feet', 'latitude', 'longitude']
 
@@ -100,8 +108,15 @@ outlier_indices = np.where(z_scores > threshold)
 # Remove outliers from DataFrame
 data_cleaned = data.drop(outlier_indices[0])
 
+data = data_cleaned.apply(pd.to_numeric, errors='coerce').dropna()
+
+Q1 = data.quantile(0.25)
+Q3 = data.quantile(0.75)
+IQR = Q3 - Q1
+data = data[~((data < (Q1 - 1.5 * IQR)) | (data > (Q3 + 1.5 * IQR))).any(axis=1)]
+
 sns.pairplot(data_cleaned, y_vars=['price_display'], x_vars=data.columns, height=2)
-plt.show()
+#plt.show()
 
 # print("Mean House Rent:", round(data["price_display"].mean()))
 # print("Median House Rent:", round(data["price_display"].median()))
@@ -115,20 +130,21 @@ plt.show()
 plt.figure(figsize=(12, 8))
 sns.heatmap(data.corr(), annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.5)
 plt.title('Correlation Matrix')
-plt.show()
+#plt.show()
 
 #Get the correlation between the features
-corr = data_cleaned.corr()
+corr = data.corr()
 #Top Features
-top_features = corr.index[abs(corr['price_display'])>0.2]
+top_features = corr.index[abs(corr['price_display'])>0.18]
 #top_features Correlation plot
-top_corr = data_cleaned[top_features].corr()
+top_corr = data[top_features].corr()
 sns.heatmap(top_corr, annot=True)
-plt.show()
+#plt.show()
 
-Y = data_cleaned['price_display']
+Y = data['price_display']
 top_features = top_features.drop('price_display')
-X = data_cleaned[top_features]
+f = ['bathrooms', 'bedrooms', 'square_feet', 'cityname', 'longitude', 'latitude']
+X = data[f]
 
 
 # data splitting
@@ -136,7 +152,7 @@ x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.20, shuffl
 
 # model training
 # polynomial model
-poly_features = PolynomialFeatures(degree=5)
+poly_features = PolynomialFeatures(degree=3)
 X_train_poly = poly_features.fit_transform(x_train)
 
 poly_model = linear_model.LinearRegression()
