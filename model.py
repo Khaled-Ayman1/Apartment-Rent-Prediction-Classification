@@ -32,33 +32,38 @@ print(data.isna().sum())
 print("Checking for Duplicated Data:")
 print(data.duplicated().sum())
 
-print("Most common value in pets_allowed:", data["pets_allowed"].mode()[0])
-print("Most common value in amenities:", data["amenities"].mode()[0])
-
 values_to_choose_from = data['address'].dropna().unique()  # Get unique values from the column, excluding NaNs
 random_values = np.random.choice(values_to_choose_from, size=len(data), replace=True)  # Generate random values
 
 # Fill the column with random values
 data['address'] = random_values
 
+bedroom_mode = data["bedrooms"].mode()[0]
+bathroom_mode = data["bathrooms"].mode()[0]
+cityname_mode = data["cityname"].mode()[0]
+state_mode = data["state"].mode()[0]
+lat_mode = data["latitude"].mode()[0]
+long_mode = data["longitude"].mode()[0]
 
-print("Most common value in bedrooms:", data["bedrooms"].mode()[0])
-print("Most common value in bathrooms:", data["bathrooms"].mode()[0])
-print("Most common value in cityname:", data["cityname"].mode()[0])
-print("Most common value in state:", data["state"].mode()[0])
-print("Most common value in latitude:", data["latitude"].mode()[0])
-print("Most common value in longitude:", data["longitude"].mode()[0])
+amenities_mode = data["amenities"].mode()[0]
+
+print("Most common value in bedrooms:", bedroom_mode)
+print("Most common value in bathrooms:", bathroom_mode)
+print("Most common value in cityname:", cityname_mode)
+print("Most common value in state:", state_mode)
+print("Most common value in latitude:", lat_mode)
+print("Most common value in longitude:", long_mode)
 
 # Handling missing values
-data["pets_allowed"].fillna('Cats,Dogs', inplace=True)
-data["amenities"].fillna('Parking', inplace=True)
-data["bathrooms"].fillna('1.0', inplace=True)
-data["bedrooms"].fillna('1.0', inplace=True)
-data["cityname"].fillna('Austin', inplace=True)
-data["state"].fillna('Austin', inplace=True)
-data["pets_allowed"].fillna('TX,Dogs', inplace=True)
-data["latitude"].fillna('30.3054', inplace=True)
-data["longitude"].fillna('-97.7497', inplace=True)
+
+data["amenities"].fillna(amenities_mode, inplace=True)
+
+data["bathrooms"].fillna(bathroom_mode, inplace=True)
+data["bedrooms"].fillna(bedroom_mode, inplace=True)
+data["cityname"].fillna(cityname_mode, inplace=True)
+data["state"].fillna(state_mode, inplace=True)
+data["latitude"].fillna(lat_mode, inplace=True)
+data["longitude"].fillna(long_mode, inplace=True)
 
 print("Checking for Missing Values after handling:")
 print(data.isna().sum())
@@ -69,9 +74,7 @@ print(data.info())
 # Preprocessing price_display column
 data['price_display'] = data['price_display'].str.replace('[^\d.]', '', regex=True).astype(float)
 
-
-
-columns_to_drop = ['category','id','price', 'title', 'body', 'source', 'time','currency', 'fee','has_photo','price_type']
+columns_to_drop = ['category','id','price', 'title', 'body', 'source', 'time','currency', 'fee','has_photo','price_type', 'pets_allowed']
 data = data.drop(columns=columns_to_drop)
 
 data.info()
@@ -83,7 +86,7 @@ def encode_categorical(data, columns):
         data[column] = label_encoder.fit_transform(data[column])
     return data
 
-categorical_columns = ['amenities', 'cityname', 'state', 'pets_allowed', 'address']
+categorical_columns = ['amenities', 'cityname', 'state', 'address']
 data_encoded = encode_categorical(data, categorical_columns)
 
 # Displaying the encoded DataFrame
@@ -91,9 +94,9 @@ print("Encoded DataFrame:")
 print(data.head())
 
 sns.pairplot(data, y_vars=['price_display'], x_vars=data.columns, height=2)
-#plt.show()
+plt.show()
 
-columns_with_outliers = ['amenities', 'bathrooms', 'bedrooms', 'pets_allowed', 'price_display', 'square_feet', 'latitude', 'longitude']
+columns_with_outliers = ['amenities', 'bathrooms', 'bedrooms', 'price_display', 'square_feet', 'latitude', 'longitude']
 
 # Calculate Z-scores for each column
 data[columns_with_outliers] = data[columns_with_outliers].astype(float)  # Convert to float
@@ -116,36 +119,36 @@ IQR = Q3 - Q1
 data = data[~((data < (Q1 - 1.5 * IQR)) | (data > (Q3 + 1.5 * IQR))).any(axis=1)]
 
 sns.pairplot(data_cleaned, y_vars=['price_display'], x_vars=data.columns, height=2)
-#plt.show()
+plt.show()
 
-# print("Mean House Rent:", round(data["price_display"].mean()))
-# print("Median House Rent:", round(data["price_display"].median()))
-# print("Highest House Rent:", round(data["price_display"].max()))
-# print("Lowest House Rent:", round(data["price_display"].min()))
-# print("\n")
-# print("Highest House Rent after removing the outliers:", round(data_cleaned["price_display"].max()))
-# print("Lowest House Rent after removing the outliers:", round(data_cleaned["price_display"].min()))
+print("Mean House Rent:", round(data["price_display"].mean()))
+print("Median House Rent:", round(data["price_display"].median()))
+print("Highest House Rent:", round(data["price_display"].max()))
+print("Lowest House Rent:", round(data["price_display"].min()))
+print("\n")
+print("Highest House Rent after removing the outliers:", round(data_cleaned["price_display"].max()))
+print("Lowest House Rent after removing the outliers:", round(data_cleaned["price_display"].min()))
 
 #correlation matrix
-plt.figure(figsize=(12, 8))
-sns.heatmap(data.corr(), annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.5)
-plt.title('Correlation Matrix')
-#plt.show()
-
-#Get the correlation between the features
 corr = data.corr()
+
+plt.figure(figsize=(12, 8))
+sns.heatmap(corr, annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.5)
+plt.title('Correlation Matrix')
+plt.show()
+
 #Top Features
-top_features = corr.index[abs(corr['price_display'])>0.18]
+top_features = corr.index[abs(corr['price_display']) > 0.1]
+print(top_features)
+
 #top_features Correlation plot
 top_corr = data[top_features].corr()
 sns.heatmap(top_corr, annot=True)
-#plt.show()
+plt.show()
 
 Y = data['price_display']
 top_features = top_features.drop('price_display')
-f = ['bathrooms', 'bedrooms', 'square_feet', 'cityname', 'longitude', 'latitude']
-X = data[f]
-
+X = data[top_features]
 
 # data splitting
 x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.20, shuffle=True, random_state=10)
