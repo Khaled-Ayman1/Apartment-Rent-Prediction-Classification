@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, OrdinalEncoder
 from sklearn.model_selection import train_test_split
 from sklearn import linear_model
 from sklearn import metrics
@@ -13,222 +13,198 @@ from sklearn.model_selection import cross_val_score
 from sklearn.feature_selection import f_classif
 
 
+
 data = pd.read_csv("data/ApartmentRentPrediction.csv")
+data['price_display'] = data['price_display'].str.replace(r'[^\d.]', '', regex=True).astype(float)
 
-# Creating Dataframe
-print("Shape of the DataFrame:", data.shape)
 
-data.head()
+columns_to_drop = ['price_display','category', 'id', 'price', 'title', 'body', 'source', 'time', 'currency', 'fee']
+X = data
+X = X.drop(columns=columns_to_drop)
+Y = data['price_display']
+X.head()
 
-print("Statistical description of the DataFrame:")
-print(data.describe())
 
-print("Columns in the DataFrame:")
-print(data.columns)
 
-# Preprocessing and Feature Selection
-print("Checking for Missing Values:")
-print(data.isna().sum())
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, shuffle=True, random_state=10)
 
-print("Checking for Duplicated Data:")
-print(data.duplicated().sum())
+
+
+print(X_train.isna().sum())
+
+
+bedroom_mean = X_train['bedrooms'].mean()
+bathroom_mean = X_train['bathrooms'].mean()
+cityname_mode = X_train['cityname'].mode()[0]
+state_mode = X_train['state'].mode()[0]
+lat_mean = X_train['latitude'].mean()
+long_mean = X_train['longitude'].mean()
+pets_mode = X_train['pets_allowed'].mode()[0]
+amenities_mode = X_train["amenities"].mode()[0]
+
 
 # Fill missing address with city and state name
-data['address'] = data.apply(lambda row: f"{row['cityname']}, {row['state']}" if pd.isnull(row['address']) else row['address'], axis=1)
+X_train['address'] = X_train.apply(lambda row: f"{row['cityname']}, {row['state']}" if pd.isnull(row['address']) else row['address'], axis=1)
 
-bedroom_mode = data["bedrooms"].mode()[0]
-bathroom_mode = data["bathrooms"].mode()[0]
-cityname_mode = data["cityname"].mode()[0]
-state_mode = data["state"].mode()[0]
-lat_mode = data["latitude"].mode()[0]
-long_mode = data["longitude"].mode()[0]
-pets_mode = data["pets_allowed"].mode()[0]
-amenities_mode = data["amenities"].mode()[0]
+X_train["amenities"].fillna(amenities_mode, inplace=True)
+X_train['bathrooms'].fillna(bathroom_mean, inplace=True)
+X_train['bedrooms'].fillna(bedroom_mean, inplace=True)
+X_train['pets_allowed'].fillna(pets_mode, inplace=True)
+X_train['cityname'].fillna(cityname_mode, inplace=True)
+X_train['state'].fillna(state_mode, inplace=True)
+X_train['latitude'].fillna(lat_mean, inplace=True)
+X_train['longitude'].fillna(long_mean, inplace=True)
 
-print("Most common value in bedrooms:", bedroom_mode)
-print("Most common value in bathrooms:", bathroom_mode)
-print("Most common value in cityname:", cityname_mode)
-print("Most common value in state:", state_mode)
-print("Most common value in latitude:", lat_mode)
-print("Most common value in longitude:", long_mode)
 
-# Handling missing values
 
-data["amenities"].fillna(amenities_mode, inplace=True)
-data["pets_allowed"].fillna(pets_mode, inplace=True)
-data["bathrooms"].fillna(bathroom_mode, inplace=True)
-data["bedrooms"].fillna(bedroom_mode, inplace=True)
-data["cityname"].fillna(cityname_mode, inplace=True)
-data["state"].fillna(state_mode, inplace=True)
-data["latitude"].fillna(lat_mode, inplace=True)
-data["longitude"].fillna(long_mode, inplace=True)
+print(X_train.isna().sum())
 
-print("Checking for Missing Values after handling:")
-print(data.isna().sum())
 
-print("Information about the DataFrame:")
-print(data.info())
 
-# Preprocessing price_display column
-data['price_display'] = data['price_display'].str.replace('[^\d.]', '', regex=True).astype(float)
-
-print(data['price_display'].describe())
-
-columns_to_drop = ['category', 'id', 'price', 'title', 'body', 'source', 'time', 'currency', 'fee']
-data = data.drop(columns=columns_to_drop)
-
-# Save categorical columns before dropping
+ordinal_Encoder = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
 categorical_columns = ['amenities', 'cityname', 'state', 'address', 'price_type', 'pets_allowed', 'has_photo']
-data_categorical = data[categorical_columns]
+X_train[categorical_columns] = ordinal_Encoder.fit_transform(X_train[categorical_columns])
+X_train.head()
 
-data.info()
+train_Data = pd.concat([X_train, Y_train], axis=1)
+train_Data.head()
 
-# Encoding
-def encode_categorical(data, columns):
-    label_encoder = LabelEncoder()
-    for column in columns:
-        data[column] = label_encoder.fit_transform(data[column])
-    return data
 
-data = encode_categorical(data, categorical_columns)
 
-# Displaying the encoded DataFrame
-print("Encoded DataFrame:")
-print(data.head())
 
-for col in data.columns:
-    sns.pairplot(data, y_vars=['price_display'], x_vars=col, height=2)
-    #plt.show()
+train_Data = train_Data.astype(float)
+z_scores = np.abs(stats.zscore(train_Data))
 
-# Calculate Z-scores for each column
-data = data.astype(float)  # Convert to float
-z_scores = np.abs(stats.zscore(data))
-
-# Set threshold for identifying outliers (e.g., Z-score > 3)
 threshold = 3
 
 # Find indices of outliers
-outlier_indices = np.where(z_scores > threshold)
+outlier_indices = np.where(z_scores > threshold)[0]
 
-# Remove outliers from DataFrame
-data_cleaned = data.drop(outlier_indices[0])
+# Remove outliers from DataFrame using iloc to safely select index positions
+data_cleaned = train_Data.iloc[~train_Data.index.isin(outlier_indices)]
 
-data = data_cleaned.apply(pd.to_numeric, errors='coerce').dropna()
+# Ensure all data is numeric and drop rows with NaNs
+train_Data = data_cleaned.apply(pd.to_numeric, errors='coerce').dropna()
 
-Q1 = data.quantile(0.25)
-Q3 = data.quantile(0.75)
+
+
+Q1 = train_Data.quantile(0.25)
+Q3 = train_Data.quantile(0.75)
 IQR = Q3 - Q1
-data = data[~((data < (Q1 - 1.5 * IQR)) | (data > (Q3 + 1.5 * IQR))).any(axis=1)]
+train_Data = train_Data[~((train_Data < (Q1 - 1.5 * IQR)) | (train_Data > (Q3 + 1.5 * IQR))).any(axis=1)]
 
-for col in data.columns:
-    sns.pairplot(data, y_vars=['price_display'], x_vars=col, height=2)
-    #plt.show()
 
-print(data['price_display'].describe())
+data_categorical = train_Data[categorical_columns]
 
-# correlation matrix
-corr = data.corr()
+# ANOVA for categorical features
+anova_results = f_classif(train_Data[categorical_columns], train_Data['price_display'])
+anova_p_values = pd.Series(anova_results[1], index=categorical_columns)
+
+significant_categorical_features = anova_p_values[anova_p_values < 0.05].index.tolist()
+
+print("Significant categorical features based on ANOVA p-values:", significant_categorical_features)
+
+
+
+
+corr = train_Data.corr()
 
 plt.figure(figsize=(12, 8))
 sns.heatmap(corr, annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.5)
 plt.title('Correlation Matrix')
 plt.show()
 
-# Encode categorical features before ANOVA
-data_encoded = encode_categorical(data, categorical_columns)
-
-# ANOVA for categorical features
-anova_results = f_classif(data_encoded[categorical_columns], data['price_display'])
-anova_p_values = pd.Series(anova_results[1], index=categorical_columns)
-
-# Select significant categorical features based on p-value threshold
-significant_categorical_features = anova_p_values[anova_p_values < 0.05].index.tolist()
-
-print("Significant categorical features based on ANOVA p-values:", significant_categorical_features)
 
 
-# Top Features
 top_features = corr.index[abs(corr['price_display']) > 0.1]
 print(top_features)
-
-# top_features Correlation plot
-top_corr = data[top_features].corr()
-sns.heatmap(top_corr, annot=True)
-plt.show()
-
-Y = data['price_display']
+Y_train = train_Data["price_display"]
 top_features = top_features.drop('price_display')
-print(top_features)
-X = data_encoded[list(significant_categorical_features) + list(top_features)]
-print(X)
+X_train = train_Data[list(significant_categorical_features) + list(top_features)]
 
-# data splitting
-x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, shuffle=True, random_state=10)
+
+
+X_test["amenities"].fillna(amenities_mode, inplace=True)
+X_test['bathrooms'].fillna(bathroom_mean, inplace=True)
+X_test['bedrooms'].fillna(bathroom_mean, inplace=True)
+X_test['state'].fillna(state_mode, inplace=True)
+X_test['longitude'].fillna(long_mean, inplace=True)
+X_test['latitude'].fillna(lat_mean, inplace=True)
+X_test['address'] = X_test.apply(lambda row: f"{row['cityname']}, {row['state']}" if pd.isnull(row['address']) else row['address'], axis=1)
+
+
+
+
+
+
+X_test[categorical_columns] = ordinal_Encoder.transform(X_test[categorical_columns])
+    
+X_test = X_test[list(significant_categorical_features) + list(top_features)]
+print(X_test.isna().sum())
+
+
 
 # polynomial model
 poly_features = PolynomialFeatures(degree=3)
-X_train_poly = poly_features.fit_transform(x_train)
+X_train_poly = poly_features.fit_transform(X_train)
 
 poly_model = linear_model.LinearRegression()
-poly_model.fit(X_train_poly, y_train)
+poly_model.fit(X_train_poly, Y_train)
 
 # model testing
-prediction = poly_model.predict(poly_features.fit_transform(x_test))
-prediction1 = poly_model.predict(poly_features.fit_transform(x_train))
+prediction = poly_model.predict(poly_features.fit_transform(X_test))
+prediction1 = poly_model.predict(poly_features.fit_transform(X_train))
 
 print("polynomial model")
-print('Mean Square Error for testing', metrics.mean_squared_error(y_test, prediction))
-print('Mean Square Error for training', metrics.mean_squared_error(y_train, prediction1))
-print("r2 score:", r2_score(y_test, prediction))
+print('Mean Square Error for testing', metrics.mean_squared_error(Y_test, prediction))
+print('Mean Square Error for training', metrics.mean_squared_error(Y_train, prediction1))
+print("r2 score:", r2_score(Y_test, prediction))
 
 # linear model
 linear_reg = linear_model.LinearRegression()
-linear_reg.fit(x_train, y_train)
+linear_reg.fit(X_train, Y_train)
 
 # model testing
-y_train_prediction = linear_reg.predict(x_train)
-y_predict = linear_reg.predict(x_test)
+y_train_prediction = linear_reg.predict(X_train)
+y_predict = linear_reg.predict(X_test)
 
 print("\nlinear model")
-print('Mean Square Error for testing', metrics.mean_squared_error(y_test, y_predict))
-print('Mean Square Error for training', metrics.mean_squared_error(y_train, y_train_prediction))
-print("r2 score:", r2_score(y_test, y_predict))
+print('Mean Square Error for testing', metrics.mean_squared_error(Y_test, y_predict))
+print('Mean Square Error for training', metrics.mean_squared_error(Y_train, y_train_prediction))
+print("r2 score:", r2_score(Y_test, y_predict))
 
 # poly model with cross validation
 print('\ncross validation')
 model_1_poly_features = PolynomialFeatures(degree=2)
 # transforms the existing features to higher degree features.
-X_train_poly_model_1 = model_1_poly_features.fit_transform(x_train)
+X_train_poly_model_1 = model_1_poly_features.fit_transform(X_train)
 
 # fit the transformed features to Linear Regression
 poly_model1 = linear_model.LinearRegression()
-scores = cross_val_score(poly_model1, X_train_poly_model_1, y_train, scoring='neg_mean_squared_error', cv=8)
+scores = cross_val_score(poly_model1, X_train_poly_model_1, Y_train, scoring='neg_mean_squared_error', cv=8)
 model_1_score = abs(scores.mean())
 
-poly_model1.fit(X_train_poly_model_1, y_train)
+poly_model1.fit(X_train_poly_model_1, Y_train)
 print("model 1 cross validation score is " + str(model_1_score))
 
 model_2_poly_features = PolynomialFeatures(degree=3)
 # transforms the existing features to higher degree features.
-X_train_poly_model_2 = model_2_poly_features.fit_transform(x_train)
+X_train_poly_model_2 = model_2_poly_features.fit_transform(X_train)
 
 # fit the transformed features to Linear Regression
 poly_model2 = linear_model.LinearRegression()
-scores = cross_val_score(poly_model2, X_train_poly_model_2, y_train, scoring='neg_mean_squared_error', cv=8)
+scores = cross_val_score(poly_model2, X_train_poly_model_2, Y_train, scoring='neg_mean_squared_error', cv=8)
 model_2_score = abs(scores.mean())
-poly_model2.fit(X_train_poly_model_2, y_train)
+poly_model2.fit(X_train_poly_model_2, Y_train)
 
 print("model 2 cross validation score is " + str(model_2_score))
 
 # predicting on test data-set
-prediction = poly_model1.predict(model_1_poly_features.fit_transform(x_test))
-print('\nModel 1 Test Mean Square Error', metrics.mean_squared_error(y_test, prediction))
-print("r2 score:", r2_score(y_test, prediction))
+prediction = poly_model1.predict(model_1_poly_features.fit_transform(X_test))
+print('\nModel 1 Test Mean Square Error', metrics.mean_squared_error(Y_test, prediction))
+print("r2 score:", r2_score(Y_test, prediction))
 
 # predicting on test data-set
-prediction = poly_model2.predict(model_2_poly_features.fit_transform(x_test))
-print('Model 2 Test Mean Square Error', metrics.mean_squared_error(y_test, prediction))
-print("r2 score:", r2_score(y_test, prediction))
-
-
-
+prediction = poly_model2.predict(model_2_poly_features.fit_transform(X_test))
+print('Model 2 Test Mean Square Error', metrics.mean_squared_error(Y_test, prediction))
+print("r2 score:", r2_score(Y_test, prediction))
