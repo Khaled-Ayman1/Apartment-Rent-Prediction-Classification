@@ -11,7 +11,7 @@ from sklearn.metrics import r2_score
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.model_selection import cross_val_score
 from sklearn.feature_selection import f_classif
-
+import joblib
 
 
 data = pd.read_csv("data/ApartmentRentPrediction.csv")
@@ -62,6 +62,10 @@ print(X_train.isna().sum())
 
 
 ordinal_Encoder = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
+
+joblib.dump(ordinal_Encoder, "ordinal_Encoder.joblib")
+
+
 categorical_columns = ['amenities', 'cityname', 'state', 'address', 'price_type', 'pets_allowed', 'has_photo']
 X_train[categorical_columns] = ordinal_Encoder.fit_transform(X_train[categorical_columns])
 X_train.head()
@@ -151,6 +155,9 @@ X_train_poly = poly_features.fit_transform(X_train)
 poly_model = linear_model.LinearRegression()
 poly_model.fit(X_train_poly, Y_train)
 
+joblib.dump(poly_model, "poly_model.joblib")
+
+
 # model testing
 prediction = poly_model.predict(poly_features.fit_transform(X_test))
 prediction1 = poly_model.predict(poly_features.fit_transform(X_train))
@@ -163,6 +170,9 @@ print("r2 score:", r2_score(Y_test, prediction))
 # linear model
 linear_reg = linear_model.LinearRegression()
 linear_reg.fit(X_train, Y_train)
+
+joblib.dump(linear_reg, "linear_reg.joblib")
+
 
 # model testing
 y_train_prediction = linear_reg.predict(X_train)
@@ -187,6 +197,9 @@ model_1_score = abs(scores.mean())
 poly_model1.fit(X_train_poly_model_1, Y_train)
 print("model 1 cross validation score is " + str(model_1_score))
 
+joblib.dump(poly_model1, "poly_model1.joblib")
+
+
 model_2_poly_features = PolynomialFeatures(degree=3)
 # transforms the existing features to higher degree features.
 X_train_poly_model_2 = model_2_poly_features.fit_transform(X_train)
@@ -198,6 +211,9 @@ model_2_score = abs(scores.mean())
 poly_model2.fit(X_train_poly_model_2, Y_train)
 
 print("model 2 cross validation score is " + str(model_2_score))
+
+joblib.dump(poly_model2, "poly_model2.joblib")
+
 
 # predicting on test data-set
 prediction = poly_model1.predict(model_1_poly_features.fit_transform(X_test))
