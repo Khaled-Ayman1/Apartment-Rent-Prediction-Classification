@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
-from sklearn.preprocessing import LabelEncoder, OrdinalEncoder
+from sklearn.preprocessing import OrdinalEncoder
 from sklearn.model_selection import train_test_split
 from sklearn import linear_model
 from sklearn import metrics
