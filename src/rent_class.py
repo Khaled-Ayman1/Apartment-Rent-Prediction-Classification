@@ -15,9 +15,15 @@ import joblib
 from sklearn.feature_selection import chi2
 from sklearn.feature_selection import SelectKBest
 
+from sklearn.model_selection import GridSearchCV
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import StackingClassifier
 
-data = pd.read_csv("data/ApartmentRentClassification.csv")
-
+data = pd.read_csv("/content/ApartmentRentPrediction_Milestone2.csv")
 
 columns_to_drop = ['category', 'id', 'title', 'body', 'source', 'time', 'currency', 'fee', 'price_type', 'RentCategory']
 X = data
@@ -41,9 +47,6 @@ lat_mean = X_train['latitude'].mean()
 long_mean = X_train['longitude'].mean()
 pets_mode = X_train['pets_allowed'].mode()[0]
 amenities_mode = X_train["amenities"].mode()[0]
-
-
-
 
 X_train["amenities"].fillna(amenities_mode, inplace=True)
 X_train['bathrooms'].fillna(bathroom_mean, inplace=True)
@@ -146,4 +149,157 @@ X_test[categorical_columns] = ordinal_Encoder.transform(X_test[categorical_colum
 
 X_test = X_test[list(best_features_names) + list(significant_numerical_features)]
 
+# Multinomial Logistic Regression Classifier
+lr_model = LogisticRegression(multi_class='multinomial', max_iter=100000)
+lr_model.fit(X_train, Y_train)
+lr_predictions = lr_model.predict(X_test)
+lr_accuracy = accuracy_score(Y_test, lr_predictions)
+print("Multinomial Logistic Regression Accuracy:", lr_accuracy)
 
+lr1 = LogisticRegression(multi_class='multinomial', solver='lbfgs', max_iter=5000000)
+lr1.fit(X_train, Y_train)
+y_pred = lr1.predict(X_test)
+accuracylr1 = accuracy_score(Y_test, y_pred)
+print("Accuracy lr1:",accuracylr1)
+
+lr2 = LogisticRegression(multi_class='multinomial',  solver='saga', max_iter=100000)
+lr2.fit(X_train, Y_train)
+y_pred = lr2.predict(X_test)
+accuracylr2 = accuracy_score(Y_test, y_pred)
+print("Accuracy lr2:", accuracylr2)
+
+lr3 = LogisticRegression(multi_class='multinomial',  solver='newton-cg', max_iter=1000)
+lr3.fit(X_train, Y_train)
+best_lr_predictions = lr3.predict(X_test)
+best_lr_accuracy = accuracy_score(Y_test, best_lr_predictions)
+print("Accuracy lr3:", best_lr_accuracy)
+#output
+# Multinomial Logistic Regression Accuracy: 0.5761111111111111
+# Accuracy lr1: 0.5761111111111111
+# Accuracy lr2: 0.5538888888888889
+# Accuracy lr3: 0.5833333333333334
+
+# Random Forest Classifier
+rf_model = RandomForestClassifier()
+rf_model.fit(X_train, Y_train)
+rf_predictions = rf_model.predict(X_test)
+rf_accuracy = accuracy_score(Y_test, rf_predictions)
+print("Random Forest Accuracy:", rf_accuracy)
+#ouput
+# Random Forest Accuracy: 0.7522222222222222
+
+# Hyperparameter tuning for Random Forest Classifier
+rf_params = {
+    'n_estimators': [100,5000],
+    'max_depth': [None],
+    'min_samples_split': [2, 5, 10],
+    'min_samples_leaf': [1, 2, 4]
+}
+rf_grid = GridSearchCV(RandomForestClassifier(), rf_params, cv=5)
+rf_grid.fit(X_train, Y_train)
+best_rf_model = rf_grid.best_estimator_
+best_rf_predictions = best_rf_model.predict(X_test)
+best_rf_accuracy = accuracy_score(Y_test, best_rf_predictions)
+print("Best Random Forest Accuracy:", best_rf_accuracy)
+print("Best Random Forest Parameters:", rf_grid.best_params_)
+#output
+# Best Random Forest Accuracy: 0.7666666666666667
+# Best Random Forest Parameters: {'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 10, 'n_estimators': 100}
+
+# Support Vector Machine Classifier
+svm_model = SVC()
+svm_model.fit(X_train, Y_train)
+svm_predictions = svm_model.predict(X_test)
+svm_accuracy = accuracy_score(Y_test, svm_predictions)
+print("Support Vector Machine Accuracy:", svm_accuracy)
+
+# Hyperparameter tuning for SVM with RBF kernel
+svm_params = {
+    'C': [0.1, 1, 10],
+    'kernel': ['rbf'],
+    'gamma': ['scale', 'auto']
+}
+svm_grid = GridSearchCV(SVC(), svm_params, cv=5)
+svm_grid.fit(X_train, Y_train)
+rbf_svm_model = svm_grid.best_estimator_
+rbf_svm_predictions = rbf_svm_model.predict(X_test)
+rbf_svm_accuracy = accuracy_score(Y_test, rbf_svm_predictions)
+print("Support Vector Machine Accuracy (RBF Kernel):", rbf_svm_accuracy)
+print("Support Vector Machine Parameters (RBF Kernel):", svm_grid.best_params_)
+#output
+#  Support Vector Machine Accuracy (RBF Kernel): 0.5316666666666666
+# Support Vector Machine Parameters (RBF Kernel): {'C': 1, 'gamma': 'auto', 'kernel': 'rbf'}
+
+ best_svm_predictions=svm_predictions
+
+# Decision Tree Classifier
+dt_model = DecisionTreeClassifier()
+dt_model.fit(X_train, Y_train)
+dt_predictions = dt_model.predict(X_test)
+dt_accuracy = accuracy_score(Y_test, dt_predictions)
+print("Decision Tree Accuracy:", dt_accuracy)
+
+# Hyperparameter tuning for Decision Tree Classifier
+dt_params = {
+    'max_depth': [None, 5, 10],
+    'min_samples_split': [2, 5, 10],
+    'min_samples_leaf': [1, 2, 4]
+}
+dt_grid = GridSearchCV(DecisionTreeClassifier(), dt_params, cv=5)
+dt_grid.fit(X_train, Y_train)
+best_dt_model = dt_grid.best_estimator_
+best_dt_predictions = best_dt_model.predict(X_test)
+best_dt_accuracy = accuracy_score(Y_test, best_dt_predictions)
+print("Best Decision Tree Accuracy:", best_dt_accuracy)
+print("Best Decision Tree Parameters:", dt_grid.best_params_)
+
+#output
+# Best Decision Tree Accuracy: 0.6561111111111111
+# Best Decision Tree Parameters: {'max_depth': 10, 'min_samples_leaf': 1, 'min_samples_split': 5}
+
+# Print classification reports for all models
+print("Logistic Regression Classification Report:")
+print(classification_report(Y_test, best_lr_predictions ))
+
+print("Random Forest Classification Report:")
+print(classification_report(Y_test, best_rf_predictions))
+
+print("Support Vector Machine Classification Report:")
+print(classification_report(Y_test, best_svm_predictions))
+
+# Print classification report for Decision Tree Classifier
+print("Decision Tree Classification Report:")
+print(classification_report(Y_test, best_dt_predictions))
+
+# Ensemble using Voting Classifier
+from sklearn.ensemble import VotingClassifier
+ensemble_model = VotingClassifier(estimators=[
+    ('Random Forest', best_rf_model),
+    ('Logistic Regression', lr_model),
+    ('Support Vector Machine', svm_model),
+    ('Decision Tree', dt_model)
+])
+ensemble_model.fit(X_train, Y_train)
+ensemble_predictions = ensemble_model.predict(X_test)
+ensemble_accuracy = accuracy_score(Y_test, ensemble_predictions)
+print("Ensemble Voting Classifier Accuracy:", ensemble_accuracy)
+print("Ensemble Voting Classifier Classification Report:")
+print(classification_report(Y_test, ensemble_predictions))
+
+# Ensemble using stacking
+#Define the base models and meta-model:
+# Base models
+base_models = [
+    ('Random Forest', best_rf_model),
+    ('Logistic Regression', lr_model),
+    ('Support Vector Machine', svm_model),
+    ('Decision Tree', dt_model)
+]
+meta_model = LogisticRegression(multi_class='multinomial', solver='newton-cg', max_iter=1000)
+stacking_model = StackingClassifier(estimators=base_models, final_estimator=meta_model)
+stacking_model.fit(X_train, Y_train)
+stacking_predictions = stacking_model.predict(X_test)
+stacking_accuracy = accuracy_score(Y_test, stacking_predictions)
+print("Stacking Classifier Accuracy:", stacking_accuracy)
+print("Stacking Classifier Classification Report:")
+print(classification_report(Y_test, stacking_predictions))
