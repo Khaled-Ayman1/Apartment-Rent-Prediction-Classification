@@ -1,7 +1,5 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 from scipy import stats
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.model_selection import train_test_split
@@ -17,6 +15,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 data = pd.read_csv("data/ApartmentRentPrediction.csv")
+
 data['price_display'] = data['price_display'].str.replace(r'[^\d.]', '', regex=True).astype(float)
 
 
@@ -43,10 +42,7 @@ lat_mean = X_train['latitude'].mean()
 long_mean = X_train['longitude'].mean()
 pets_mode = X_train['pets_allowed'].mode()[0]
 amenities_mode = X_train["amenities"].mode()[0]
-
-
-# Fill missing address with city and state name
-X_train['address'] = X_train.apply(lambda row: f"{row['cityname']}, {row['state']}" if pd.isnull(row['address']) else row['address'], axis=1)
+square_feet_mean = X_train['square_feet'].mode()[0]
 
 X_train["amenities"].fillna(amenities_mode, inplace=True)
 X_train['bathrooms'].fillna(bathroom_mean, inplace=True)
@@ -57,23 +53,28 @@ X_train['state'].fillna(state_mode, inplace=True)
 X_train['latitude'].fillna(lat_mean, inplace=True)
 X_train['longitude'].fillna(long_mean, inplace=True)
 
+joblib.dump(bedroom_mean, 'models/regression/dependencies/bedroom_mean.joblib')
+joblib.dump(bathroom_mean, 'models/regression/dependencies/bathroom_mean.joblib')
+joblib.dump(cityname_mode, 'models/regression/dependencies/cityname_mode.joblib')
+joblib.dump(state_mode, 'models/regression/dependencies/state_mode.joblib')
+joblib.dump(long_mean, 'models/regression/dependencies/long_mean.joblib')
+joblib.dump(pets_mode, 'models/regression/dependencies/pets_mode.joblib')
+joblib.dump(amenities_mode, 'models/regression/dependencies/amenities_mode.joblib')
+joblib.dump(square_feet_mean, 'models/regression/dependencies/square_feet_mean.joblib')
 
-
-#print(X_train.isna().sum())
-
+# Fill missing address with city and state name
+X_train['address'] = X_train.apply(lambda row: f"{row['cityname']}, {row['state']}" if pd.isnull(row['address']) else row['address'], axis=1)
 
 ordinal_Encoder = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
-
-joblib.dump(ordinal_Encoder, "models/ordinal_Encoder.joblib")
-
 
 categorical_columns = ['amenities', 'cityname', 'state', 'address', 'price_type', 'pets_allowed', 'has_photo']
 X_train[categorical_columns] = ordinal_Encoder.fit_transform(X_train[categorical_columns])
 # X_train.head()
 
+joblib.dump(ordinal_Encoder, "models/regression/dependencies/ordinal_Encoder.joblib")
+
 train_Data = pd.concat([X_train, Y_train], axis=1)
 # train_Data.head()
-
 
 train_Data = train_Data.astype(float)
 z_scores = np.abs(stats.zscore(train_Data))
@@ -89,13 +90,10 @@ data_cleaned = train_Data.iloc[~train_Data.index.isin(outlier_indices)]
 # Ensure all data is numeric and drop rows with NaNs
 train_Data = data_cleaned.apply(pd.to_numeric, errors='coerce').dropna()
 
-
-
 Q1 = train_Data.quantile(0.25)
 Q3 = train_Data.quantile(0.75)
 IQR = Q3 - Q1
 train_Data = train_Data[~((train_Data < (Q1 - 1.5 * IQR)) | (train_Data > (Q3 + 1.5 * IQR))).any(axis=1)]
-
 
 data_categorical = train_Data[categorical_columns]
 
@@ -107,8 +105,7 @@ significant_categorical_features = anova_p_values[anova_p_values < 0.05].index.t
 
 #print("Significant categorical features based on ANOVA p-values:", significant_categorical_features)
 
-
-
+joblib.dump(significant_categorical_features, 'models/regression/dependencies/significant_categorical_features.joblib')
 
 corr = train_Data.corr()
 
@@ -117,12 +114,12 @@ corr = train_Data.corr()
 # plt.title('Correlation Matrix')
 # plt.show()
 
-
-
 top_features = corr.index[abs(corr['price_display']) > 0.1]
 #print(top_features)
 Y_train = train_Data["price_display"]
 top_features = top_features.drop('price_display')
+
+joblib.dump(top_features, 'models/regression/dependencies/top_features.joblib')
 
 X_train = train_Data[list(significant_categorical_features) + list(top_features)]
 
@@ -142,15 +139,12 @@ X_test = X_test[list(significant_categorical_features) + list(top_features)]
 #print(X_test.isna().sum())
 
 
-
 # polynomial model
 poly_features = PolynomialFeatures(degree=2)
 X_train_poly = poly_features.fit_transform(X_train)
 
 poly_model = linear_model.LinearRegression()
 poly_model.fit(X_train_poly, Y_train)
-
-joblib.dump(poly_model, "models/poly_model.joblib")
 
 
 # model testing
@@ -165,9 +159,6 @@ print("r2 score:", r2_score(Y_test, prediction))
 # linear model
 linear_reg = linear_model.LinearRegression()
 linear_reg.fit(X_train, Y_train)
-
-joblib.dump(linear_reg, "models/linear_reg.joblib")
-
 
 # model testing
 y_train_prediction = linear_reg.predict(X_train)
@@ -192,8 +183,7 @@ model_1_score = abs(scores.mean())
 poly_model1.fit(X_train_poly_model_1, Y_train)
 print("Polynomial Model cross validation score is " + str(model_1_score))
 
-joblib.dump(poly_model1, "models/cv_poly_model.joblib")
-
+joblib.dump((model_1_poly_features, poly_model1), "models/regression/cv_poly_model.joblib")
 
 # fit the transformed features to Linear Regression
 cv_lin_reg = linear_model.LinearRegression()
@@ -203,8 +193,7 @@ modelscore = abs(scores.mean())
 cv_lin_reg.fit(X_train, Y_train)
 print("Linear Model cross validation score is " + str(modelscore))
 
-joblib.dump(cv_lin_reg, "models/cv_linear_reg.joblib")
-
+joblib.dump(cv_lin_reg, "models/regression/cv_lin_model.joblib")
 
 # predicting on test data-set
 prediction = poly_model1.predict(model_1_poly_features.fit_transform(X_test))
