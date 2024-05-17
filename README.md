@@ -28,7 +28,8 @@ The dataset used for training and testing the model consists of the following fe
 - **longitude**: Longitude coordinate of the apartment location.
 - **source**: Source of the listing.
 - **time**: Timestamp of the listing.
-
+- **RentCategory**: Type of rent price
+  
 ## Usage
 1. **Data Preprocessing**: Before using the model, preprocess the dataset to handle missing values, encode categorical variables, and scale numerical features.
 2. **Model Training**: Train the model using suitable algorithms such as linear regression, decision trees, or neural networks. Tune hyperparameters as necessary.
