@@ -1,4 +1,4 @@
-# Apartment Rent Prediction Model
+# Apartment Rent Prediction & Classification Model
 
 ## Overview
 This repository contains a machine learning model designed to predict apartment rental prices based on various features. The model utilizes a dataset with information on apartment listings including features such as number of bathrooms, bedrooms, amenities, location, and more.
